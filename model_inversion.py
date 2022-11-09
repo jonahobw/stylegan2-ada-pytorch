@@ -30,22 +30,24 @@ def size_range(s: str) -> List[int]:
 @click.command()
 @click.pass_context
 @click.option('--gan', 'gan_pkl', help='GAN pickle filename', required=True)
-@click.option('--classifier', 'classifier_pkl', help='Classifier pickle filename', default = "")
-@click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=0.8, show_default=True)
+@click.option('--classifier', 'classifier_pkl', help='Classifier pickle filename', default = "", show_default=True)
+@click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
+@click.option('--outdir', type=str, help='Where to store generated images')
 @click.option('--scale-type',
                 type=click.Choice(['pad', 'padside', 'symm','symmside']),
-                default='pad', help='scaling method for --size', required=False)
+                default='pad', help='scaling method for --size', required=False, show_default=True)
 @click.option('--size', type=size_range, help='size of output (in format x-y)')
-@click.option('--seed', type=int, help='List of random seeds', default=0)
-@click.option('--device', type=str, help='Torch Device', default="cuda")
+@click.option('--seed', type=int, help='List of random seeds', default=0, show_default=True)
+@click.option('--count_max', type=int, help='Max number of model inversion iterations', default=100, show_default=True)
+@click.option('--device', type=str, help='Torch Device', default="cuda", show_default=True)
 
 
 def load_gan(
     ctx: click.Context,
-    gan_pkl: str,
-    scale_type: str,
-    size: List[int],
-    device: str
+    gan_pkl: Optional[str],
+    scale_type: Optional[str],
+    size: Optional[List[int]],
+    device: Optional[str]
 ):
     # custom size code from https://github.com/eps696/stylegan2ada/blob/master/src/_genSGAN2.py
     if(size): 
@@ -71,10 +73,10 @@ def load_gan(
 def generate_image(
     ctx: click.Context,
     G,
-    outdir: str,
-    truncation_psi: float,
-    seed: int,
-    device: str,
+    outdir: Optional[str],
+    truncation_psi: Optional[float],
+    seed: Optional[int],
+    device: Optional[str],
     latent: torch.Tensor = None,
     save: str = None,
     show: bool = False
@@ -123,8 +125,8 @@ def create_f(target_class, classifier, preprocess, gan):
 
 def load_classifier(
     ctx: click.Context,
-    classifier_pkl: str,
-    device: str
+    classifier_pkl: Optional[str],
+    device: Optional[str]
 ):
     # weights = torch.hub.load("pytorch/vision", "get_weight", weights="ResNet50_Weights.IMAGENET1K_V2")
     # model = torch.hub.load("pytorch/vision", "resnet50", weights=weights)
@@ -153,8 +155,8 @@ def num_grad(f, x, delta = 1):
 
 def model_inversion(
     ctx: click.Context,
-    target_class: int,
-    count_max: int = 100
+    target_class: Optional[int],
+    count_max: Optional[int]
 ):
     classifier, preprocess = load_classifier()
     gan = load_gan()

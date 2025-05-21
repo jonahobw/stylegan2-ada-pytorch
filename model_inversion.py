@@ -1,15 +1,8 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-
-"""Generate images using pretrained network pickle."""
+"""Perform a model inversion attack."""
 
 import os
 from typing import List, Optional
+import logging
 
 import click
 from tqdm import tqdm
@@ -21,6 +14,10 @@ import torch.nn.functional as F
 from torchvision.models import resnet50, ResNet50_Weights
 
 import legacy
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def load_gan(gan_pkl: str, device: str):
@@ -158,6 +155,21 @@ def num_grad(f, z, delta=1):
     default=2,
     show_default=True,
 )
+@click.option(
+    "--confidence_threshold",
+    type=float,
+    help="Target confidence threshold for early stopping",
+    default=0.4,
+    show_default=True,
+)
+@click.option(
+    "--patience",
+    type=int,
+    help="Number of iterations without improvement before early stopping",
+    default=10,
+    show_default=True,
+)
+
 def model_inversion(
     ctx: click.Context,
     gan_pkl: Optional[str],
@@ -168,36 +180,62 @@ def model_inversion(
     count_max: int,
     device: Optional[str],
     target_class: Optional[int],
-    step_size: Optional[float]
+    step_size: Optional[float],
+    confidence_threshold: float,
+    patience: int,
 ):
-    classifier, preprocess = load_classifier(
-        classifier_pkl=classifier_pkl, device=device
-    )
-    gan = load_gan(gan_pkl=gan_pkl, device=device)
-    f = create_f(
-        target_class=target_class,
-        classifier=classifier,
-        preprocess=preprocess,
-        gan=gan,
-        outdir=outdir,
-        truncation_psi=truncation_psi,
-        device=device,
-    )
+    try:
+        classifier, preprocess = load_classifier(
+            classifier_pkl=classifier_pkl, device=device
+        )
+        gan = load_gan(gan_pkl=gan_pkl, device=device)
+        f = create_f(
+            target_class=target_class,
+            classifier=classifier,
+            preprocess=preprocess,
+            gan=gan,
+            outdir=outdir,
+            truncation_psi=truncation_psi,
+            device=device,
+        )
 
-    # numeric black box gradient ascent
-    x, z = generate_image(
-        G=gan, outdir=outdir, truncation_psi=truncation_psi, seed=seed, device=device
-    )
-    count = 0
-    conf = 0
-    while conf < 0.4 or count > count_max:
-        conf = f(z, save=str(count), show=True)
-        print(f"Iteration {count}, Conf = {conf}")
-        grad = num_grad(f, z)
-        z += step_size*grad
-        count += 1
+        # numeric black box gradient ascent
+        x, z = generate_image(
+            G=gan,
+            outdir=outdir,
+            truncation_psi=truncation_psi,
+            seed=seed,
+            device=device,
+        )
+        count = 0
+        best_conf = 0
+        no_improvement_count = 0
 
-    print(f"Model inversion completed in {count} iterations.")
+        while count < count_max and best_conf < confidence_threshold:
+            conf = f(z, save=str(count), show=True)
+            logger.info(f"Iteration {count}, Conf = {conf:.4f}")
+
+            if conf > best_conf:
+                best_conf = conf
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
+
+            if no_improvement_count >= patience:
+                logger.info(f"Early stopping: No improvement for {patience} iterations")
+                break
+
+            grad = num_grad(f, z)
+            z += step_size * grad
+            count += 1
+
+        logger.info(
+            f"Model inversion completed in {count} iterations with best confidence {best_conf:.4f}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error during model inversion: {str(e)}")
+        raise
 
 
 # ----------------------------------------------------------------------------

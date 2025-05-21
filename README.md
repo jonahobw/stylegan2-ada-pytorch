@@ -1,3 +1,42 @@
+## Model Inversion Attack applied to StyleGAN2
+**Author:** Jonah O'Brien Weiss  
+**Updated on:** 11/8/2022
+
+This repo adds a model inversion attack script for StyleGAN2-ADA, implemented in `model_inversion.py`. The script demonstrates how to perform a black-box model inversion attack, optimizing the latent vector of StyleGAN2 to maximize the confidence of a target classifier for a specific class.
+
+### How to Run
+
+0. See the [Requirements](#requirements).
+
+1. **Build the Docker image (if using Docker):**
+   ```sh
+   docker build -t stylegan2-ada .
+   ```
+
+2. **Start the Docker container (with GPU):**
+   ```sh
+   docker run --gpus all -it --rm -v $(pwd):/workspace stylegan2-ada
+   ```
+
+3. **Run the model inversion attack:**
+   ```sh
+   python model_inversion.py \
+     --gan=<path_or_url_to_gan_pkl> \
+     --classifier=<path_to_classifier_pkl> \
+     --target_class=<class_index> \
+     --outdir=out_model_inversion \
+     --device=cuda
+   ```
+   - Replace `<path_or_url_to_gan_pkl>` with the path or URL to your StyleGAN2-ADA `.pkl` file.
+   - Replace `<path_to_classifier_pkl>` with the path to your classifier weights (optional, defaults to ImageNet ResNet50).
+   - Set `<class_index>` to the target class index for inversion.
+   - Additional options: `--seed`, `--count_max`, `--step_size`, etc. See `python model_inversion.py --help` for all options.
+
+---
+
+*The original README continues below.*
+
+
 ## Add to Colab
 
 ### StyleGAN2-ADA PyTorch (Start Here)
@@ -105,6 +144,8 @@ This repository is a faithful reimplementation of [StyleGAN2-ADA](https://github
 * Docker users: use the [provided Dockerfile](./Dockerfile) to build an image with the required library dependencies.
 
 The code relies heavily on custom PyTorch extensions that are compiled on the fly using NVCC. On Windows, the compilation requires Microsoft Visual Studio. We recommend installing [Visual Studio Community Edition](https://visualstudio.microsoft.com/vs/) and adding it into `PATH` using `"C:\Program Files (x86)\Microsoft Visual Studio\<VERSION>\Community\VC\Auxiliary\Build\vcvars64.bat"`.
+
+Link back to [How to Run](#how-to-run)
 
 ## Getting started
 
